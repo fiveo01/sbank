@@ -46,11 +46,12 @@ class lazy_nhoods(object):
 
 class Bank(object):
 
-    def __init__(self, noise_model, flow, use_metric=False, cache_waveforms=False, nhood_size=1.0,
+    def __init__(self, noise_model, flow, f_final, use_metric=False, cache_waveforms=False, nhood_size=1.0,
                  nhood_param="tau0", coarse_match_df=None, iterative_match_df_max=None,
                  fhigh_max=None, optimize_flow=None):
         self.noise_model = noise_model
         self.flow = flow
+        self.f_final = f_final
         self.use_metric = use_metric
         self.cache_waveforms = cache_waveforms
         self.coarse_match_df = coarse_match_df
@@ -114,8 +115,8 @@ class Bank(object):
         merged._nmatch = sum(b._nmatch for b in banks)
         return merged
 
-    def add_from_sngls(self, sngls, tmplt_class):
-        newtmplts = [tmplt_class.from_sngl(s, bank=self) for s in sngls]
+    def add_from_sngls(self, sngls, tmplt_class, f_final):
+        newtmplts = [tmplt_class.from_sngl(s, f_final, bank=self) for s in sngls]
         for template in newtmplts:
             # Mark all templates as seed points
             template.is_seed_point = True
@@ -142,7 +143,7 @@ class Bank(object):
     @classmethod
     def from_sngls(cls, sngls, tmplt_class, *args, **kwargs):
         bank = cls(*args, **kwargs)
-        new_tmplts = [tmplt_class.from_sngl(s, bank=bank) for s in sngls]
+        new_tmplts = [tmplt_class.from_sngl(s, kwargs['fhigh_max'], bank=bank) for s in sngls]
         bank._templates.extend(new_tmplts)
         bank._templates.sort(key=attrgetter(bank.nhood_param))
         # Mark all templates as seed points
@@ -216,7 +217,7 @@ class Bank(object):
                 PSD = get_PSD(self.coarse_match_df, self.flow, f_max,
                               self.noise_model)
                 match = self.compute_match(tmplt, proposal,
-                                           self.coarse_match_df, PSD=PSD)
+                                           self.coarse_match_df, f_final=self.f_final, PSD=PSD)
                 if match == 0:
                     err_msg = "Match is 0. This might indicate that you have "
                     err_msg += "the df value too high. Please try setting the "
@@ -267,21 +268,55 @@ class Bank(object):
             return (0., 0)
         return match, self._templates[best_tmplt_ind]
 
-    def argmax_match(self, proposal):
+    def argmax_match(self, proposal, template_pn_order):
         # find templates in the bank "near" this tmplt
         prop_nhd = getattr(proposal, self.nhood_param)
         low, high = _find_neighborhood(self._nhoods, prop_nhd, self.nhood_size)
         tmpbank = self._templates[low:high]
         if not tmpbank:
             return (0., 0)
+        
+         # initialize list to store matches
+        matches = []
 
         # set parameters of match calculation that are optimized for this block
-        df, ASD = get_neighborhood_ASD(tmpbank + [proposal], self.flow,
-                                       self.noise_model)
+        df_end, ASD = get_neighborhood_ASD(tmpbank + [proposal], self.flow, 
+                                           self.noise_model)
+        
+        # start with iterative match df max if it is larger than df_end
+        df_start = max(df_end, self.iterative_match_df_max)
+
+        # calculate matches iterative match df max until the calculations converge
+        for tmplt in tmpbank: 
+            df = df_start
+            match_last = 0
+
+            while df >= df_end:
+
+                ASD = get_ASD(df, self.flow, self.f_final, self.noise_model)
+                match = self.compute_match(tmplt, proposal, df, ASD=ASD, f_final=self.f_final, pn_order = template_pn_order)
+                if match == 0:
+                    err_msg = "Match is 0. This might indicate that you have "
+                    err_msg += "the df value too high. Please try setting the "
+                    err_msg += "iterative-match-df-max value lower."
+                    # FIXME: This could be dealt with dynamically??
+                    raise ValueError(err_msg)
+
+                # calculation converged
+                if match_last > 0 and abs(match_last - match) < 0.001:
+                    break
+
+                # otherwise, refine calculation
+                match_last = match
+                df /= 2.0
+
+            if df < self.iterative_match_df_max: print("Using df: %f\n" % df)
+            matches.append(match_last)
+
 
         # compute matches
-        matches = [self.compute_match(tmplt, proposal, df, ASD=ASD)
-                   for tmplt in tmpbank]
+        # matches = [self.compute_match(tmplt, proposal, df, f_final=self.f_final, ASD=ASD, pn_order=template_pn_order) 
+        #            for tmplt in tmpbank]
         best_tmplt_ind = np.argmax(matches)
         self._nmatch += len(tmpbank)
 

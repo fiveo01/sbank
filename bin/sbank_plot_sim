@@ -110,7 +110,7 @@ if __name__ == "__main__":
         tmplt_chi = [SimIMRPhenomBComputeChi(float(row["mass1"]), float(row["mass2"]), float(row["spin1z"]), float(row["spin2z"])) for row in tmplt_arr]
 
     # FIXME hack
-    inj_dur = [SimIMRSEOBNRv4ROMTimeOfFrequency(flow, float(row["mass1"]) * MSUN_SI, float(row["mass2"]) * MSUN_SI, float(row["spin1z"]), float(row["spin2z"])) for row in inj_arr]
+    # inj_dur = [SimIMRSEOBNRv4ROMTimeOfFrequency(flow, float(row["mass1"]) * MSUN_SI, float(row["mass2"]) * MSUN_SI, float(row["spin1z"]), float(row["spin2z"])) for row in inj_arr]
 
 
     #
@@ -134,7 +134,20 @@ if __name__ == "__main__":
 
 
     smallest_match = match.min()
-
+    import matplotlib.figure
+    matplotlib.rcParams.update({
+            "font.size": 12.0,
+            "axes.titlesize": 12.0,
+            "axes.labelsize": 12.0,
+            "xtick.labelsize": 12.0,
+            "ytick.labelsize": 12.0,
+            "legend.fontsize": 10.0,
+            "figure.dpi": 300,
+            "savefig.dpi": 300,
+            "text.usetex": True,
+            "path.simplify": True,
+            "font.family": "serif"
+    })
     from matplotlib.figure import Figure
     from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
@@ -164,25 +177,25 @@ if __name__ == "__main__":
     fig.savefig(name+"_match_vs_injm1_vs_injm2_binned_lum_weighted.png")
 
 
-    fig = Figure()
-    ax = fig.add_subplot(111)
-    vals, xedges, yedges = np.histogram2d(inj_M, inj_eta, bins=(6,6), weights= match**3 * inj_sigmasq**(3./2))
-    norm, xedges, yedges = np.histogram2d(inj_M, inj_eta, bins=(6,6), weights=inj_sigmasq**(3./2))
-    vals = ( vals / np.array(norm + 1e-10, dtype="float") )**(1./3)
-    x, y= np.meshgrid(xedges, yedges)
-    coll = ax.pcolor(x, y, vals.T, vmin=0.9*vals[vals>0].min(), vmax=1)
-    ax.set_xlabel("$M_\mathrm{total}$ ($M_\odot$)")
-    ax.set_ylabel("$\eta$")
-    ax.set_xticks((xedges[:-1] + xedges[1:])/2)
-    ax.set_yticks((yedges[:-1] + yedges[1:])/2)
-    ax.set_xticklabels(["%.1f" % round(k,1) for k in ax.get_xticks()])
-    ax.set_yticklabels(["%.3f" % round(k,3) for k in ax.get_yticks()])
-    ax.set_xlim([xedges.min(), xedges.max()])
-    ax.set_ylim([yedges.min(), yedges.max()])
-    fig.colorbar(coll, ax=ax).set_label("Effective Fitting Factor")
-    ax.grid(True)
-    canvas = FigureCanvas(fig)
-    fig.savefig(name+"_match_vs_injM_vs_injeta_binned_lum_weighted.png")
+    # fig = Figure()
+    # ax = fig.add_subplot(111)
+    # vals, xedges, yedges = np.histogram2d(inj_M, inj_eta, bins=(6,6), weights= match**3 * inj_sigmasq**(3./2))
+    # norm, xedges, yedges = np.histogram2d(inj_M, inj_eta, bins=(6,6), weights=inj_sigmasq**(3./2))
+    # vals = ( vals / np.array(norm + 1e-10, dtype="float") )**(1./3)
+    # x, y= np.meshgrid(xedges, yedges)
+    # coll = ax.pcolor(x, y, vals.T, vmin=0.9*vals[vals>0].min(), vmax=1)
+    # ax.set_xlabel("$M_\mathrm{total}$ ($M_\odot$)")
+    # ax.set_ylabel("$\eta$")
+    # ax.set_xticks((xedges[:-1] + xedges[1:])/2)
+    # ax.set_yticks((yedges[:-1] + yedges[1:])/2)
+    # ax.set_xticklabels(["%.1f" % round(k,1) for k in ax.get_xticks()])
+    # ax.set_yticklabels(["%.3f" % round(k,3) for k in ax.get_yticks()])
+    # ax.set_xlim([xedges.min(), xedges.max()])
+    # ax.set_ylim([yedges.min(), yedges.max()])
+    # fig.colorbar(coll, ax=ax).set_label("Effective Fitting Factor")
+    # ax.grid(True)
+    # canvas = FigureCanvas(fig)
+    # fig.savefig(name+"_match_vs_injM_vs_injeta_binned_lum_weighted.png")
 
 
     #
@@ -221,6 +234,7 @@ if __name__ == "__main__":
     coll = ax.hexbin(inj_sigmasq**(0.5)/(8*inj_mchirp**(5./6)), inj_mchirp, gridsize=25, C=match)
     ax.set_xlabel("SNR=8 Horizon Chirp Distance (Mpc)")
     ax.set_ylabel("$\mathcal{M}_\mathrm{chirp}$")
+    ax.set_xlim([min(inj_sigmasq**(0.5)/(8*inj_mchirp**(5./6))), max(inj_sigmasq**(0.5)/(8*inj_mchirp**(5./6)))])
     fig.colorbar(coll, ax=ax).set_label("Mean Fitting Factor")
     ax.grid(True)
     canvas = FigureCanvas(fig)
@@ -263,15 +277,15 @@ if __name__ == "__main__":
     canvas = FigureCanvas(fig)
     fig.savefig(name+"_match_vs_injMc.png")
 
-    fig = Figure()
-    ax = fig.add_subplot(111)
-    ax.plot(inj_dur, match, marker = ".", linestyle="None")
-    ax.axvline(x=0.2, linewidth=2, color='k')
-    ax.set_xlabel("Injection Duration (s)")
-    ax.set_ylabel("Fitting Factor Between Injection and Template Bank")
-    ax.grid(True)
-    canvas = FigureCanvas(fig)
-    fig.savefig(name+"_match_vs_injdur.png")
+    # fig = Figure()
+    # ax = fig.add_subplot(111)
+    # ax.plot(inj_dur, match, marker = ".", linestyle="None")
+    # ax.axvline(x=0.2, linewidth=2, color='k')
+    # ax.set_xlabel("Injection Duration (s)")
+    # ax.set_ylabel("Fitting Factor Between Injection and Template Bank")
+    # ax.grid(True)
+    # canvas = FigureCanvas(fig)
+    # fig.savefig(name+"_match_vs_injdur.png")
 
     fig = Figure()
     ax = fig.add_subplot(111)
@@ -288,6 +302,8 @@ if __name__ == "__main__":
     collection = ax.scatter(inj_arr["mass1"], tmplt_arr["mass1"], c=match, s=20, vmin=smallest_match, linewidth=0, alpha=0.5, vmax=1)
     ax.set_xlabel("Injection $m_1$")
     ax.set_ylabel("Best Matching Template $m_1$ ($M_\odot$)")
+    ax.set_xlim([min(inj_arr["mass1"]), max(inj_arr["mass1"])])
+    ax.set_ylim([min(tmplt_arr["mass1"]), max(tmplt_arr["mass1"])])
     ax.grid(True)
     fig.colorbar(collection, ax=ax).set_label("Fitting Factor")
     canvas = FigureCanvas(fig)
@@ -298,6 +314,8 @@ if __name__ == "__main__":
     collection = ax.scatter(inj_arr["mass2"], tmplt_arr["mass2"], c=match, s=20, vmin=smallest_match, linewidth=0, alpha=0.5, vmax=1)
     ax.set_xlabel("Injection $m_2$")
     ax.set_ylabel("Best Matching Template $m_2$ ($M_\odot$)")
+    ax.set_xlim([min(inj_arr["mass2"]), max(inj_arr["mass2"])])
+    ax.set_ylim([min(tmplt_arr["mass2"]), max(tmplt_arr["mass2"])])
     ax.grid(True)
     fig.colorbar(collection, ax=ax).set_label("Fitting Factor")
     canvas = FigureCanvas(fig)
@@ -317,7 +335,7 @@ if __name__ == "__main__":
     ax = fig.add_subplot(111)
     collection = ax.scatter(inj_eta, tmplt_eta, c=match, s=20, vmin=smallest_match, linewidth=0, alpha=0.5, vmax=1)
     ax.set_xlabel("Injection $\eta$")
-    ax.set_ylabel("Best Matching Template $eta$")
+    ax.set_ylabel("Best Matching Template $\eta$")
     ax.set_xlim([inj_eta.min(), inj_eta.max()])
     ax.set_ylim([tmplt_eta.min(), tmplt_eta.max()])
     ax.grid(True)
@@ -330,6 +348,8 @@ if __name__ == "__main__":
     collection = ax.scatter(inj_M, tmplt_M, c=match, s=20, vmin=smallest_match, linewidth=0, alpha=0.5, vmax=1)
     ax.set_xlabel("Injection total mass, $M$ ($M_\odot$)")
     ax.set_ylabel("Best Matching Template $M$ ($M_\odot$)")
+    ax.set_xlim([min(inj_M), max(inj_M)])
+    ax.set_ylim([min(tmplt_M), max(tmplt_M)])
     ax.grid(True)
     fig.colorbar(collection, ax=ax).set_label("Fitting Factor")
     canvas = FigureCanvas(fig)
@@ -340,6 +360,8 @@ if __name__ == "__main__":
     collection = ax.scatter(inj_mchirp, tmplt_mchirp, c=match, s=20, vmin=smallest_match, linewidth=0, alpha=0.5, vmax=1)
     ax.set_xlabel("Injection $\mathcal{M}_\mathrm{chirp}$ ($M_\odot$)")
     ax.set_ylabel("Best Matching Template $\mathcal{M}_\mathrm{chirp}$ ($M_\odot$)")
+    ax.set_xlim([min(inj_mchirp), max(inj_mchirp)])
+    ax.set_ylim([min(tmplt_mchirp), max(tmplt_mchirp)])
     ax.grid(True)
     fig.colorbar(collection, ax=ax).set_label("Fitting Factor")
     canvas = FigureCanvas(fig)
@@ -350,6 +372,8 @@ if __name__ == "__main__":
     collection = ax.scatter(tmplt_arr["mass1"], tmplt_arr["mass2"], c=match, s=20, vmin=smallest_match, linewidth=0, alpha=0.5, vmax=1)
     ax.set_xlabel("Template $m_1$ ($M_\odot$)")
     ax.set_ylabel("Template $m_2$ ($M_\odot$)")
+    ax.set_xlim([min(tmplt_arr["mass1"]), max(tmplt_arr["mass1"])])
+    ax.set_ylim([min(tmplt_arr["mass2"]), max(tmplt_arr["mass2"])])
     ax.grid(True)
     fig.colorbar(collection, ax=ax).set_label("Fitting Factor")
     canvas = FigureCanvas(fig)
@@ -360,6 +384,8 @@ if __name__ == "__main__":
     collection = ax.scatter(inj_arr["mass1"], inj_arr["mass2"], c=match, s=20, vmin=smallest_match, linewidth=0, alpha=0.5, vmax=1)
     ax.set_xlabel("Injected $m_1$ ($M_\odot$)")
     ax.set_ylabel("Injected $m_2$ ($M_\odot$)")
+    ax.set_xlim([min(inj_arr["mass1"]), max(inj_arr["mass1"])])
+    ax.set_ylim([min(inj_arr["mass2"]), max(inj_arr["mass2"])])
     ax.grid(True)
     fig.colorbar(collection, ax=ax).set_label("Fitting Factor")
     canvas = FigureCanvas(fig)
@@ -425,6 +451,8 @@ if __name__ == "__main__":
     ax.set_xlabel(r"Template $M_{total}$ ($M_\odot$)")
     ax.set_ylabel(r"Template $%s$" % tmplt_chi_label)
     ax.set_title(r"Colorbar is Fitting Factor; assuming $f_\mathrm{low}=%d\,\mathrm{Hz}$" % flow)
+    ax.set_xlim([min(tmplt_M), max(tmplt_M)])
+    ax.set_ylim([min(tmplt_chi), max(tmplt_chi)])
     ax.grid(True)
     fig.colorbar(collection, ax=ax).set_label("Fitting Factor")
     canvas = FigureCanvas(fig)
@@ -448,8 +476,21 @@ if __name__ == "__main__":
     collection = ax.scatter(inj_M, inj_chi, c=match, s=20, vmin=smallest_match, linewidth=0, alpha=0.5, vmax=1)
     ax.set_xlabel("Injected Total Mass")
     ax.set_ylabel("Injected $%s$" % inj_chi_label)
+    ax.set_xlim([min(inj_M), max(inj_M)])
+    ax.set_ylim([min(inj_chi), max(inj_chi)])
     ax.grid(True)
     fig.colorbar(collection, ax=ax).set_label("Fitting Factor")
     canvas = FigureCanvas(fig)
     fig.savefig(name+"_match_vs_injM_vs_injchi.png")
 
+    fig = Figure()
+    ax = fig.add_subplot(111)
+    collection = ax.scatter(tmplt_eta, tmplt_mchirp, c=match, s=20, vmin=smallest_match, linewidth=0, alpha=0.5, vmax=1)
+    ax.set_xlabel("Template $\eta$")
+    ax.set_ylabel("Template $\mathcal{M}_\mathrm{chirp}$ ($M_\odot$)")
+    ax.set_xlim([min(tmplt_eta), max(tmplt_eta)])
+    ax.set_ylim([min(tmplt_mchirp), max(tmplt_mchirp)])
+    ax.grid(True)
+    fig.colorbar(collection, ax=ax).set_label("Fitting Factor")
+    canvas = FigureCanvas(fig)
+    fig.savefig(name+"_match_vs_tmplteta_vs_tmpltmchirp.png")

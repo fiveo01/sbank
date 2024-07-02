@@ -376,7 +376,7 @@ else:
 #
 # initialize the bank
 #
-bank = Bank(noise_model, opts.flow, opts.use_metric, opts.cache_waveforms, opts.neighborhood_size,
+bank = Bank(noise_model, opts.flow, opts.fhigh_max, opts.use_metric, opts.cache_waveforms, opts.neighborhood_size,
             opts.neighborhood_param, coarse_match_df=opts.coarse_match_df,
             iterative_match_df_max=opts.iterative_match_df_max, fhigh_max=opts.fhigh_max,
             optimize_flow=opts.optimize_flow)
@@ -513,7 +513,7 @@ else:
         params['duration'] = (opts.duration_min, opts.duration_max)
 
     # get the correct generator for the chosen approximant
-    proposal = proposals[opts.approximant](opts.flow, tmplt_class, bank,
+    proposal = proposals[opts.approximant](opts.flow, tmplt_class, bank, opts.fhigh_max,
                                            **params)
 
 

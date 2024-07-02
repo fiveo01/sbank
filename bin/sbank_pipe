@@ -134,6 +134,7 @@ class SBankChooseMchirpBoundariesJob(inspiral.InspiralAnalysisJob):
         self.set_universe("local")
         self.set_sub_file(tag_base+'.sub')
         self.tag_base = tag_base
+        self.add_condor_cmd('getenv','True')
         self.set_stdout_file('logs/'+tag_base+'-$(macroid)-$(process).out')
         self.set_stderr_file('logs/'+tag_base+'-$(macroid)-$(process).err')
         self.add_condor_cmd('request_memory', '1000')

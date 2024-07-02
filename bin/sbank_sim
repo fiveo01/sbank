@@ -89,6 +89,7 @@ def parse_command_line():
     parser.add_option("--mtotal-max",default = float('inf'), type="float", help="Cull injections based on total mass")
     parser.add_option("--duration-min",default = 0, type="float", help="Cull injections based on duration")
     parser.add_option("--template-bank",default = [], action="append", metavar="FILE[:APPROX]")
+    parser.add_option("--template-pn-order", default = -1, type="int", help="Specify the post-newtonian order to be used in constructing template waveforms. Default is -1 (the highest possible order). Only implemented for TaylorF2Template.")
     parser.add_option("--template-approx",default = None, help="Approximant to be used for templates when not specified with file.")
     parser.add_option("--noise-model", choices=list(noise_models.keys()), default="aLIGOZeroDetHighPower", help="Choose a noise model for the PSD from a set of available analytical model")
     parser.add_option("--reference-psd", help="Read PSD from xml instead of using analytical noise model.")
@@ -100,6 +101,8 @@ def parse_command_line():
     parser.add_option("--cache-waveforms", default = False, action="store_true", help="A given waveform in the template bank will be used many times throughout the bank simulation process. You can save a considerable amount of CPU by caching the waveform from the first time it is generated; however, do so only if you are sure that storing the waveforms in memory will not overload the system memory.")
     parser.add_option("--neighborhood-size", metavar="N", default = 1.0, type="float", help="Specify the window size in seconds to define \"nearby\" templates used to compute the match against each injection. The neighborhood is chosen symmetric about the injection; \"nearby\" is defined using the option --neighborhood-type. The default value of 1.0 is *not a guarantee of performance*. Choosing the neighborhood too small may lead to the reporting of lower-than-actual fitting factors.")
     parser.add_option("--neighborhood-param", default="tau0", choices=["tau0", "dur"], help="Choose how the neighborhood is sorted for match calculations.")
+    parser.add_option("--f-final", default = 4096.0, type="float", help="The upper frequency cut off for computing waveforms")
+    parser.add_option("--iterative-match-df-max", type="float", default=None, help="If this option is given it will enable sbank using larger df values than 1 / data length when computing overlaps. Sbank will then compute a match at this value, and at half this value, if the two values agree to 0.1% the value obtained will be taken as the actual value. If the values disagree the match will be computed again using a df another factor of 2 smaller until convergence or a df of 1/ data_length, is reached.")
 
     opts, args = parser.parse_args()
 
@@ -123,6 +126,8 @@ usertag = opts.user_tag  # use to label output
 inj_file = opts.injection_file # pre-sorted by mchirp
 inj_approx = waveforms[opts.injection_approx]
 flow = opts.flow
+f_final = opts.f_final
+pn_order = opts.template_pn_order
 verbose = opts.verbose
 if opts.use_gpu_match:
     from sbank.overlap_cuda import compute_match, create_workspace_cache
@@ -146,7 +151,8 @@ process = ligolw_process.register_to_xmldoc(fake_xmldoc, "sbank_sim",
 #
 # initialize the bank
 #
-bank = Bank(noise_model, flow, use_metric=False, cache_waveforms=opts.cache_waveforms, nhood_size=opts.neighborhood_size, nhood_param=opts.neighborhood_param)
+bank = Bank(noise_model, flow, f_final, use_metric=False, cache_waveforms=opts.cache_waveforms, nhood_size=opts.neighborhood_size, 
+            nhood_param=opts.neighborhood_param, iterative_match_df_max=opts.iterative_match_df_max)
 for file_approx in opts.template_bank:
 
     # if no approximant specified, take from opts.template_approx
@@ -156,12 +162,15 @@ for file_approx in opts.template_bank:
     else:
         # if this fails, you have an input error
         seed_file, approx = file_approx.split(":")
+    if (approx != "TaylorF2") and (pn_order != -1):
+         raise Exception("You entered PN Phase Order = %i and approximant = %s, but PN Phase order other than the default = -1 is only implemented for TaylorF2 approximant." % (pn_order, approx))
 
     # add templates to bank
     tmpdoc = utils.load_filename(seed_file, contenthandler=ContentHandler)
     sngl_inspiral = lsctables.SnglInspiralTable.get_table(tmpdoc)
     seed_waveform = waveforms[approx]
-    bank.add_from_sngls(sngl_inspiral, seed_waveform)
+    #bank.add_from_sngls(sngl_inspiral, seed_waveform)
+    bank.add_from_sngls(sngl_inspiral, seed_waveform, f_final)
 
     if opts.verbose:
         print("Added %d %s templates from %s to bank." % (len(sngl_inspiral), approx, seed_file))
@@ -211,18 +220,18 @@ if verbose:
 # main worker loop
 # FIXME: this (potentially) breaks using mixed template bank approximants
 match_map = np.empty(len(sims), dtype=[("match", np.float32), ("inj_sigmasq", np.float32)])
-inj_bank = Bank(noise_model, flow)
+inj_bank = Bank(noise_model, flow, f_final)
 tmplts = lsctables.SnglInspiralTable()
 for j, sim in enumerate(sims):
 
-    inj_wf = inj_approx.from_sim(sim, bank=inj_bank)
+    inj_wf = inj_approx.from_sim(sim, f_final, bank=inj_bank)
     inj_ind = opts.injection_min + j
     if verbose:
         print("injection %d/%d" % (j+1, len(sims)))
         print(inj_format % inj_wf.params)
 
     # NB: sigmasq set during argmax_match
-    match_tup = bank.argmax_match(inj_wf)
+    match_tup = bank.argmax_match(inj_wf, pn_order)
 
     if verbose:
         print("\tbest matching template:  ", end=' ')

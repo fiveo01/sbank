@@ -522,7 +522,7 @@ def IMRPhenomC_param_generator(flow, tmplt_class, bank, **kwargs):
         yield tmplt_class(mass1, mass2, spin1, spin2, bank=bank)
 
 
-def aligned_spin_param_generator(flow, tmplt_class, bank, **kwargs):
+def aligned_spin_param_generator(flow, tmplt_class, bank, fhigh_max, **kwargs):
     """
     Specify the min and max mass of the bigger component, the min and
     max mass of the total mass and the min and max values for the
@@ -563,7 +563,7 @@ def aligned_spin_param_generator(flow, tmplt_class, bank, **kwargs):
         spin2 = uniform(s2min, s2max)
         spin1 = (chis*mtot - mass2*spin2)/mass1
 
-        t = tmplt_class(mass1, mass2, spin1, spin2, bank=bank)
+        t = tmplt_class(mass1, mass2, spin1, spin2, bank=bank, fhigh_max=fhigh_max, flow=flow)
         if (dur_min is not None and t.dur < dur_min) \
                 or (dur_max is not None and t.dur > dur_max):
             continue

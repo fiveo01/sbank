@@ -23,6 +23,7 @@ import numpy as np
 from numpy import float32
 import lal
 import lalsimulation as lalsim
+from lalsimulation import SimInspiralWaveformParamsInsertPNPhaseOrder
 from lal import MSUN_SI, MTSUN_SI, PC_SI, PI
 from lal import CreateREAL8Vector, CreateCOMPLEX8FrequencySeries
 from ligo.lw.lsctables import SnglInspiralTable as llwsit
@@ -189,7 +190,7 @@ class AlignedSpinTemplate(object):
                  ('template_duration', float32), ('f_lower', float32),
                  ('approximant', 'S32')]
 
-    def __init__(self, m1, m2, spin1z, spin2z, bank, flow=None, duration=None):
+    def __init__(self, m1, m2, spin1z, spin2z, bank, fhigh_max=4096.0, flow=None, duration=None):
 
         self.m1 = float(m1)
         self.m2 = float(m2)
@@ -213,7 +214,7 @@ class AlignedSpinTemplate(object):
         self.tau0_40 = compute_tau0_40(self._mchirp)
         self.tau0 = compute_tau0(self._mchirp, bank.flow)
         self._dur = duration
-        self._f_final = None
+        self._f_final = fhigh_max
         self._fhigh_max = bank.fhigh_max
 
     def optimize_flow(self, flow_min, fhigh_max, noise_model, df=0.1,
@@ -299,12 +300,12 @@ class AlignedSpinTemplate(object):
         raise NotImplementedError(err_msg)
 
     @classmethod
-    def from_sim(cls, sim, bank):
-        return cls(sim.mass1, sim.mass2, sim.spin1z, sim.spin2z, bank)
+    def from_sim(cls, sim, f_final, bank):
+        return cls(sim.mass1, sim.mass2, sim.spin1z, sim.spin2z, bank, f_final)
 
     @classmethod
-    def from_sngl(cls, sngl, bank):
-        return cls(sngl.mass1, sngl.mass2, sngl.spin1z, sngl.spin2z, bank)
+    def from_sngl(cls, sngl, f_final, bank):
+        return cls(sngl.mass1, sngl.mass2, sngl.spin1z, sngl.spin2z, bank, fhigh_max=f_final)
 
     @classmethod
     def from_dict(cls, params, idx, bank):
@@ -357,7 +358,7 @@ class AlignedSpinTemplate(object):
         """
         pass
 
-    def _compute_waveform(self, df, f_final):
+    def _compute_waveform(self, df, f_final, pn_order):
 
         phi0 = 0  # This is a reference phase, and not an intrinsic parameter
         approx = lalsim.GetApproximantFromString(self.approximant)
@@ -381,15 +382,15 @@ class AlignedSpinTemplate(object):
                 None, approx)
         return hplus_fd
 
-    def get_whitened_normalized(self, df, ASD=None, PSD=None):
+    def get_whitened_normalized(self, df, f_final=f_final, ASD=None, PSD=None, pn_order=-1):
         """
         Return a COMPLEX8FrequencySeries of the waveform, whitened by the
         given ASD and normalized. The waveform is not zero-padded to
         match the length of the ASD, so its normalization depends on
         its own length.
         """
-        if df not in self._wf:
-            wf = self._compute_waveform(df, self.f_final)
+        if not self._wf.has_key(df):
+            wf = self._compute_waveform(df, self.f_final, pn_order)
             if ASD is None:
                 ASD = PSD**0.5
             if wf.data.length > len(ASD):
@@ -446,7 +447,7 @@ class InspiralAlignedSpinTemplate(AlignedSpinTemplate):
     """
     __slots__ = ("chired")
 
-    def __init__(self, m1, m2, spin1z, spin2z, bank, flow=None, duration=None):
+    def __init__(self, m1, m2, spin1z, spin2z, bank, fhigh_max=4096.0, flow=None, duration=None):
 
         self.chired = lalsim.SimInspiralTaylorF2ReducedSpinComputeChi(
             m1,
@@ -454,7 +455,7 @@ class InspiralAlignedSpinTemplate(AlignedSpinTemplate):
             spin1z,
             spin2z
         )
-        AlignedSpinTemplate.__init__(self, m1, m2, spin1z, spin2z, bank,
+        AlignedSpinTemplate.__init__(self, m1, m2, spin1z, spin2z, bank, fhigh_max=fhigh_max,
                                      flow=flow, duration=duration)
 
     def _get_dur(self):
@@ -574,10 +575,10 @@ class TaylorF2RedSpinTemplate(InspiralAlignedSpinTemplate):
     param_names = ("m1", "m2", "chired")
     param_formats = ("%.5f", "%.5f", "%+.4f")
 
-    __slots__ = ("chired", "tau0", "_dur", "_mchirp", "_eta", "_theta0",
-                 "_theta3", "_theta3s", "bank")
+    __slots__ = ("chired", "tau0", "_dur", "_mchirp", "_eta", "_theta0", "_theta3", 
+                 "_theta3s", "flow", "tau0_40")
 
-    def __init__(self, m1, m2, spin1z, spin2z, bank, flow=None, duration=None):
+    def __init__(self, m1, m2, spin1z, spin2z, bank, fhigh_max=4096.0, flow=None, duration=None):
 
         warn_msg = ("DEPRECATION WARNING: It is not a good idea to use this "
                     "approximant. The TaylorF2 approximant is the best thing "
@@ -589,7 +590,7 @@ class TaylorF2RedSpinTemplate(InspiralAlignedSpinTemplate):
                     "automatically stays up to date, is more accurate.")
         logging.warn(warn_msg)
         AlignedSpinTemplate.__init__(self, m1, m2, spin1z, spin2z, bank,
-                                     flow=flow, duration=duration)
+                                    fhigh_max=fhigh_max, flow=flow, duration=duration)
         self.chired = lalsim.SimInspiralTaylorF2ReducedSpinComputeChi(
             m1,
             m2,
@@ -648,9 +649,11 @@ class TaylorF2RedSpinTemplate(InspiralAlignedSpinTemplate):
 class TaylorF2Template(InspiralAlignedSpinTemplate):
     approx_name = "TaylorF2"
 
-    def _compute_waveform(self, df, f_final):
+    def _compute_waveform(self, df, f_final, pn_order):
         phi0 = 0  # This is a reference phase, and not an intrinsic parameter
         LALpars = lal.CreateDict()
+        SimInspiralWaveformParamsInsertPNPhaseOrder(LALpars, pn_order)
+
         approx = lalsim.GetApproximantFromString(self.approx_name)
         hplus_fd, hcross_fd = lalsim.SimInspiralChooseFDWaveform(
             self.m1*MSUN_SI, self.m2*MSUN_SI,
