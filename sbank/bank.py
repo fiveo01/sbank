@@ -46,9 +46,12 @@ class lazy_nhoods(object):
 
 class Bank(object):
 
+    # def __init__(self, noise_model, flow, f_final, use_metric=False, cache_waveforms=False, nhood_size=1.0,
+    #              nhood_param="tau0", coarse_match_df=None, iterative_match_df_max=None,
+    #              fhigh_max=None, optimize_flow=None):
     def __init__(self, noise_model, flow, f_final, use_metric=False, cache_waveforms=False, nhood_size=1.0,
-                 nhood_param="tau0", coarse_match_df=None, iterative_match_df_max=None,
-                 fhigh_max=None, optimize_flow=None):
+                 nhood_param="tau0", coarse_match_df=1.0, iterative_match_df_max=1.0,
+                 fhigh_max=1.0, optimize_flow=1.0, pn_order = -1):
         self.noise_model = noise_model
         self.flow = flow
         self.f_final = f_final
@@ -57,6 +60,7 @@ class Bank(object):
         self.coarse_match_df = coarse_match_df
         self.iterative_match_df_max = iterative_match_df_max
         self.optimize_flow = optimize_flow
+        self.pn_order = pn_order
 
         if (
             self.coarse_match_df
@@ -70,7 +74,6 @@ class Bank(object):
             self.fhigh_max = (2**(np.ceil(np.log2(fhigh_max))))
         else:
             self.fhigh_max = fhigh_max
-
         self.nhood_size = nhood_size
         self.nhood_param = nhood_param
 
@@ -212,12 +215,13 @@ class Bank(object):
             match_last = 0
 
             if self.coarse_match_df:
+                # print("debug messgage for self.coarse_match_df == true in bank.py in line 218")
                 # Perform a match at high df to see if point can be quickly
                 # ruled out as already covering the proposal
                 PSD = get_PSD(self.coarse_match_df, self.flow, f_max,
                               self.noise_model)
                 match = self.compute_match(tmplt, proposal,
-                                           self.coarse_match_df, f_final=self.f_final, PSD=PSD)
+                                           self.coarse_match_df, f_final=self.f_final, PSD=PSD, pn_order = self.pn_order)
                 if match == 0:
                     err_msg = "Match is 0. This might indicate that you have "
                     err_msg += "the df value too high. Please try setting the "
@@ -229,9 +233,9 @@ class Bank(object):
                     continue
 
             while df >= df_end:
-
+                # print("inside the df line 236 bank.py")
                 PSD = get_PSD(df, self.flow, f_max, self.noise_model)
-                match = self.compute_match(tmplt, proposal, df, PSD=PSD)
+                match = self.compute_match(tmplt, proposal, df, PSD=PSD, pn_order = self.pn_order)
                 if match == 0:
                     err_msg = "Match is 0. This might indicate that you have "
                     err_msg += "the df value too high. Please try setting the "

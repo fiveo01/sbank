@@ -1,0 +1,15 @@
+# Template bank parameters
+LOW_FREQUENCY_CUTOFF = 10.0
+HIGH_FREQUENCY_CUTOFF = 1024
+SAMPLE_RATE = 21.0
+
+gstlal_bank.xml.gz :
+	sbank --verbose --approximant TaylorF2 --mass1-min 1.0 --mass1-max 2.0 --mass2-min 1.0 --mass2-max 2.0 --flow $(LOW_FREQUENCY_CUTOFF) --noise-model aLIGOZeroDetHighPower --instrument H1 --spin1-min 0 --spin1-max 0 --checkpoint 50 --iterative-match-df-max 2.0 --coarse-match-df 2.0 --aligned-spin --output-filename $@ --match-min 0.98 --fhigh-max 1024 --spin2-max 0 --spin2-min 0 --verbose
+
+
+
+
+#python sbank --verbose --approximant TaylorF2 --mass1-min 1.0 --mass1-max 2.0 --mass2-min 1.0 --mass2-max 2.0 --flow 10.0 --noise-model aLIGOZeroDetHighPower --instrument H1 --spin1-min 0 --spin1-max 0 --checkpoint 50 --iterative-match-df-max 2.0 --coarse-match-df 2.0 --aligned-spin --output-filename gstlal_bank.xml.gz --match-min 0.5 --fhigh-max 1024 --spin2-max 0 --spin2-min 0 --verbose
+
+
+

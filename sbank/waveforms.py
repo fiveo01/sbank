@@ -218,7 +218,7 @@ class AlignedSpinTemplate(object):
         self._fhigh_max = bank.fhigh_max
 
     def optimize_flow(self, flow_min, fhigh_max, noise_model, df=0.1,
-                      sigma_frac=0.99):
+                      sigma_frac=0.99, pn_order = -1):
         """Set the template's flow as high as possible but still recovering
         at least the given fraction of the template's sigma when calculated
         from the minimum allowed flow. This avoids having unnecessarily long
@@ -226,7 +226,7 @@ class AlignedSpinTemplate(object):
         """
         # compute the whitened waveform
         asd = get_ASD(df, flow_min, fhigh_max, noise_model)
-        wf = self._compute_waveform(df, fhigh_max)
+        wf = self._compute_waveform(df, fhigh_max, pn_order)
         if wf.data.length > len(asd):
             asd2 = np.ones(wf.data.length) * np.inf
             asd2[:len(asd)] = asd
@@ -382,14 +382,17 @@ class AlignedSpinTemplate(object):
                 None, approx)
         return hplus_fd
 
-    def get_whitened_normalized(self, df, f_final=f_final, ASD=None, PSD=None, pn_order=-1):
+    def get_whitened_normalized(self, df, pn_order, f_final=f_final, ASD=None, PSD=None ):
         """
         Return a COMPLEX8FrequencySeries of the waveform, whitened by the
         given ASD and normalized. The waveform is not zero-padded to
         match the length of the ASD, so its normalization depends on
         its own length.
         """
-        if not self._wf.has_key(df):
+        # if not self._wf.has_key(df):
+        if not df in self._wf:
+            # print("print the pn_order in waveform.py in line 394", pn_order)
+
             wf = self._compute_waveform(df, self.f_final, pn_order)
             if ASD is None:
                 ASD = PSD**0.5
@@ -415,9 +418,10 @@ class AlignedSpinTemplate(object):
     def metric_match(self, other, df, **kwargs):
         raise NotImplementedError
 
-    def brute_match(self, other, df, workspace_cache, **kwargs):
-        return SBankComputeMatch(self.get_whitened_normalized(df, **kwargs),
-                                 other.get_whitened_normalized(df, **kwargs),
+    def brute_match(self, other, df, workspace_cache, pn_order, **kwargs):
+        # print(": test for dict has key in waveforms line 419", self._wf)
+        return SBankComputeMatch(self.get_whitened_normalized(df, pn_order, **kwargs),
+                                 other.get_whitened_normalized(df,pn_order, **kwargs),
                                  workspace_cache[0])
 
     def clear(self):

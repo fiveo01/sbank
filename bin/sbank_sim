@@ -231,6 +231,7 @@ for j, sim in enumerate(sims):
         print(inj_format % inj_wf.params)
 
     # NB: sigmasq set during argmax_match
+    
     match_tup = bank.argmax_match(inj_wf, pn_order)
 
     if verbose:
